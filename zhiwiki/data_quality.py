@@ -2,8 +2,9 @@
 
 from collections import Counter
 import csv
-import io
-import json
+
+from .csv_validation import CsvFieldTooLarge, csv_rows
+from .json_validation import parse_json
 
 
 def _issue(code, severity, message):
@@ -15,18 +16,32 @@ def _structured_issues(source_key, text):
     """Describe structural faults without assuming business-specific rules."""
     name = source_key.lower()
     if name.endswith(".json"):
+        duplicate_count = 0
+
+        def count_duplicate_keys(pairs):
+            """Count repeats inside each object without exposing its keys or values."""
+            nonlocal duplicate_count
+            counts = Counter(key for key, _ in pairs)
+            duplicate_count += sum(count - 1 for count in counts.values() if count > 1)
+            return dict(pairs)
+
         try:
-            json.loads(text)
+            parse_json(text, object_pairs_hook=count_duplicate_keys)
         except (ValueError, RecursionError):
             return [_issue("invalid_json", "warning", "JSON 结构无效，请检查数据来源。")]
+        if duplicate_count:
+            return [_issue("duplicate_key", "warning", f"JSON 存在 {duplicate_count} 次重复键，请人工核对。")]
+        return []
     if not name.endswith(".csv"):
         return []
     try:
-        rows = csv.reader(io.StringIO(text, newline=""), strict=True)
+        rows = csv_rows(text)
         header = next(rows, [])
         irregular = sum(1 for row in rows if len(row) != len(header))
+    except CsvFieldTooLarge as error:
+        return [_issue("csv_field_too_large", "warning", str(error))]
     except csv.Error:
-        return [_issue("invalid_csv", "warning", "CSV 格式无法解析，请检查引号和换行。")]
+        return [_issue("invalid_csv", "warning", "CSV 解析失败，请检查格式及字段长度限制。")]
     issues = []
     if not header or any(not item.strip() for item in header):
         issues.append(_issue("empty_header", "warning", "CSV 存在空表头，请人工核对。"))

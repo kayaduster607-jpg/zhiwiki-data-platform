@@ -4,6 +4,7 @@ import asyncio
 import sqlite3
 import time
 import logging
+import threading
 from contextlib import asynccontextmanager
 from types import SimpleNamespace
 
@@ -32,6 +33,7 @@ def create_service_app(settings=None, database=None):
     database = database or ServiceDatabase(settings)
     auth, indexes, gate = Authorization(database), Indexes(database), Admission(settings)
     services = SimpleNamespace(settings=settings, db=database, auth=auth, indexes=indexes, gate=gate, telemetry=Telemetry(),
+                               upload_lock=threading.Lock(),
                                retrievals=Retrievals(database, auth, indexes), jobs=Jobs(database, auth, indexes))
     instance = InstanceLock(database.root / "team-api.lock")
 
@@ -108,6 +110,21 @@ def create_service_app(settings=None, database=None):
             return {"status": "ready"}
         except (ServiceError, OSError):
             return JSONResponse({"status": "not_ready"}, 503)
+
+    @app.get("/health/worker", include_in_schema=False)
+    def worker_health():
+        """Report the supervisor heartbeat without claiming parser readiness."""
+        try:
+            with database.tx() as connection:
+                row = connection.execute(
+                    "SELECT payload FROM team_runtime WHERE name='worker_heartbeat'"
+                ).fetchone()
+            age = time.time() - float(row[0]) if row else float("inf")
+            if 0 <= age <= 30:
+                return {"status": "alive"}
+        except (ServiceError, sqlite3.Error, TypeError, ValueError, OverflowError):
+            pass
+        return JSONResponse({"status": "unavailable"}, 503)
 
     @app.get("/v1/capabilities")
     def capabilities(request: Request):

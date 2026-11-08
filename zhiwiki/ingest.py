@@ -1,13 +1,15 @@
 """Read only explicitly selected files; never load .env files or external parts."""
 
-import io
 import csv
-import json
+import io
 import re
 import zipfile
 from pathlib import Path, PurePosixPath
 from typing import Dict
 from xml.etree import ElementTree
+
+from .csv_validation import CsvFieldTooLarge, csv_rows
+from .json_validation import parse_json
 
 
 MAX_FILE_BYTES = 2 * 1024 * 1024
@@ -21,11 +23,6 @@ class _NoDoctypeBuilder(ElementTree.TreeBuilder):
 
     def doctype(self, name, pubid, system):
         raise ValueError("DOCX 不允许 DTD 或实体定义")
-
-
-def _reject_json_constant(value):
-    """Reject non-standard NaN and Infinity tokens before indexing source text."""
-    raise ValueError("非标准 JSON 数值: " + value)
 
 
 def _check_path(path: str) -> None:
@@ -76,16 +73,18 @@ def parse_upload(filename: str, data: bytes) -> Dict[str, str]:
             raise ValueError("文本、CSV 和 JSON 必须使用 UTF-8 编码") from error
         if suffix == ".json":
             try:
-                json.loads(text, parse_constant=_reject_json_constant)
+                parse_json(text)
             except (ValueError, RecursionError) as error:
                 raise ValueError("JSON 格式无效") from error
         elif suffix == ".csv":
             try:
                 # Validate CSV syntax while retaining the original text and offsets.
-                for _ in csv.reader(io.StringIO(text, newline=""), strict=True):
+                for _ in csv_rows(text):
                     pass
+            except CsvFieldTooLarge:
+                raise
             except csv.Error as error:
-                raise ValueError("CSV 格式无效") from error
+                raise ValueError("CSV 解析失败，请检查格式及字段长度限制") from error
     _validate_text(text)
     return {"title": Path(basename).stem, "text": text, "source_key": basename}
 

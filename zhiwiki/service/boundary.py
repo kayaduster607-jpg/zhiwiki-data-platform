@@ -57,7 +57,7 @@ class RequestBoundary:
             origin = headers.get(b"origin", b"").decode("latin1")
             if origin and urlsplit(origin).netloc != headers.get(b"host", b"").decode("latin1"):
                 raise ServiceError(403, "CROSS_SITE_REQUEST")
-            public = path in ("/", "/login", "/health/live", "/health/ready") or (path == "/v1/sessions" and scope["method"] == "POST")
+            public = path in ("/", "/login", "/health/live", "/health/ready", "/health/worker") or (path == "/v1/sessions" and scope["method"] == "POST")
             if not public:
                 from http.cookies import SimpleCookie
                 cookies = SimpleCookie()

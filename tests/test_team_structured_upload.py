@@ -1,5 +1,7 @@
 """Team imports keep source bytes, require review and enforce access limits."""
 
+import csv
+import hashlib
 import time
 
 import pytest
@@ -106,6 +108,33 @@ def test_same_bytes_with_new_format_get_new_processing_job(team):
     assert "duplicate_header" in {item["code"] for item in quality["rule_issues"]}
 
 
+def test_long_csv_field_returns_actionable_worker_error(team):
+    limit = csv.field_size_limit()
+    if limit + 10 > 500_000:
+        pytest.skip("Runtime CSV field limit exceeds the document text limit")
+    content = ("name\n" + "x" * (limit + 1) + "\n").encode("utf-8")
+    response = upload(team, "large-field.csv", content, "large-field")
+    assert response.status_code == 202, response.text
+    job = process(team, response.json()["job_id"])
+    assert job["status"] == "failed"
+    assert job["error"] == "CSV_FIELD_TOO_LARGE"
+
+
+def test_upload_rejects_corrupt_existing_content_addressed_blob(team):
+    content = b"valid original content that should be stored safely"
+    checksum = hashlib.sha256(content).hexdigest()
+    target = team[1].db.root / "uploads" / checksum
+    corrupt = b"x" * len(content)
+    target.write_bytes(corrupt)
+
+    response = upload(team, "sample.txt", content, "corrupt-existing")
+
+    assert response.status_code == 503
+    assert response.json()["error"]["code"] == "UPLOAD_STORE_CORRUPTED"
+    assert target.read_bytes() == corrupt
+    assert not list(target.parent.glob("*.pending"))
+
+
 def test_old_pipeline_result_does_not_skip_new_quality_rules(team):
     client, services, _ = team
     first = upload(team, "source.txt", b"Some text with enough length for this test.", "pipeline-source")
@@ -119,6 +148,55 @@ def test_old_pipeline_result_does_not_skip_new_quality_rules(team):
     assert updated.status_code == 202, updated.text
     assert updated.json()["unchanged"] is False
     assert process(team, updated.json()["job_id"])["revision_id"] != old["revision_id"]
+
+
+def test_legacy_json_is_rechecked_after_quality_rule_upgrade(team, monkeypatch):
+    """A matching legacy file must not reuse a result from before the new rule."""
+    import zhiwiki.service.jobs as jobs_module
+    import zhiwiki.service.worker as worker_module
+
+    client, _, _ = team
+    content = b'{"code":"legacy","code":"new","description":"A long example for the quality rules"}'
+    original_assess = worker_module.assess_page
+
+    def legacy_assess(filename, text, **kwargs):
+        # Model the previously deployed rule set while retaining other warnings.
+        result = original_assess(filename, text, **kwargs)
+        remaining = [issue for issue in result.get("rule_issues", []) if issue["code"] != "duplicate_key"]
+        if remaining:
+            result["rule_issues"] = remaining
+        else:
+            result.pop("rule_issues", None)
+        return result
+
+    with monkeypatch.context() as legacy:
+        legacy.setattr(jobs_module, "PIPELINE", "pdf-text-nfkc-visible-glyphs-fixed900-120-quality-v2")
+        legacy.setattr(worker_module, "assess_page", legacy_assess)
+        first = upload(team, "legacy.json", content, "legacy-quality")
+        assert first.status_code == 202, first.text
+        old = process(team, first.json()["job_id"])
+        old_path = review_and_publish(team, old)
+
+    old_page = client.get(old_path + "/pages/1").json()
+    assert "duplicate_key" not in {issue["code"] for issue in old_page["quality"].get("rule_issues", [])}
+
+    updated = upload(team, "legacy.json", content, "legacy-quality", "update", old["document_id"], old["revision_id"])
+    assert updated.status_code == 202, updated.text
+    assert updated.json()["unchanged"] is False
+    current = process(team, updated.json()["job_id"])
+    assert current["revision_id"] != old["revision_id"]
+    current_path = "/v1/workspaces/default/documents/{}/revisions/{}".format(current["document_id"], current["revision_id"])
+    page = client.get(current_path + "/pages/1").json()
+    assert page["raw_text"].encode("utf-8") == content
+    assert "duplicate_key" in {issue["code"] for issue in page["quality"]["rule_issues"]}
+    assert client.get(old_path + "/pages/1").json()["quality"] == old_page["quality"]
+
+    # Once published under the new pipeline, identical uploads remain deduplicated.
+    review_and_publish(team, current, old["revision_id"])
+    repeated = upload(team, "legacy.json", content, "legacy-quality", "update", current["document_id"], current["revision_id"])
+    assert repeated.status_code == 202, repeated.text
+    assert repeated.json()["unchanged"] is True
+    assert repeated.json()["job_id"] == current["job_id"]
 
 
 @pytest.mark.parametrize("filename,content", [

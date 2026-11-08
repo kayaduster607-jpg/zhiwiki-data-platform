@@ -1,6 +1,7 @@
 """Supervised import process: checkpoints survive restarts; leases fence writers."""
 
 import json
+import logging
 import os
 import re
 import subprocess
@@ -10,6 +11,7 @@ import unicodedata
 import hashlib
 
 from ..ingest import parse_upload
+from ..csv_validation import CsvFieldTooLarge
 from .auth import Authorization
 from .common import ServiceError
 from .database import ServiceDatabase
@@ -63,6 +65,9 @@ def process_job(settings, job_id, fence):
             quality = assess_page(filename, parsed["text"])
             jobs.page(job_id, fence, 1, parsed["text"], parsed["text"], quality, 1)
         jobs.finish(job_id, fence)
+    except CsvFieldTooLarge:
+        # Surface a stable actionable code without exposing the uploaded data.
+        jobs.finish(job_id, fence, "CSV_FIELD_TOO_LARGE")
     except ServiceError as error:
         if error.code != "WORKER_LEASE_LOST":
             jobs.finish(job_id, fence, error.code)
@@ -88,16 +93,26 @@ def supervise(settings, once=False):
             time.sleep(0.5)
             continue
         # Only public non-secret settings enter this private runtime file.
-        config = database.root / "worker-settings.json"
-        from dataclasses import asdict
-        config.write_text(json.dumps(asdict(settings)), encoding="utf-8")
-        command = [settings.worker_python, "-B", "-m", "zhiwiki.service", "--config", str(config),
-                   "process-job", claimed["id"], str(claimed["fence"])]
-        options = {"cwd": str(__import__("pathlib").Path(__file__).resolve().parents[2]),
-                   "stdout": subprocess.DEVNULL, "stderr": subprocess.DEVNULL}
-        if os.name == "nt":
-            options["creationflags"] = subprocess.CREATE_NO_WINDOW
-        child = subprocess.Popen(command, **options)
+        try:
+            config = database.root / "worker-settings.json"
+            from dataclasses import asdict
+            config.write_text(json.dumps(asdict(settings)), encoding="utf-8")
+            command = [settings.worker_python, "-B", "-m", "zhiwiki.service", "--config", str(config),
+                       "process-job", claimed["id"], str(claimed["fence"])]
+            options = {"cwd": str(__import__("pathlib").Path(__file__).resolve().parents[2]),
+                       "stdout": subprocess.DEVNULL, "stderr": subprocess.DEVNULL}
+            if os.name == "nt":
+                options["creationflags"] = subprocess.CREATE_NO_WINDOW
+            child = subprocess.Popen(command, **options)
+        except OSError as error:
+            # Mark a claimed job failed; never log paths or OS exception bodies.
+            logging.getLogger("zhiwiki.service").warning("parser_start_failed exception_type=%s", type(error).__name__)
+            jobs.finish(claimed["id"], claimed["fence"], "IMPORT_PROCESS_START_FAILED")
+            if once:
+                return
+            # A broken interpreter or permissions can affect every queued job.
+            time.sleep(0.5)
+            continue
         started = time.monotonic()
         row = claimed
         while child.poll() is None:

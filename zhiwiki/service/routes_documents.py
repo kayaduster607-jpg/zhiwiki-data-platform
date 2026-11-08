@@ -15,6 +15,26 @@ from .models import MetadataInput, PageCorrectionInput, ReviewInput
 from .routes_retrieval import context, envelope, idempotency_key, workspace
 
 
+def _commit_upload(services, temporary, checksum, size):
+    """Install new bytes or verify an existing content-addressed upload."""
+    target = services.db.root / "uploads" / checksum
+    with services.upload_lock:
+        if target.is_symlink():
+            raise ServiceError(503, "UPLOAD_STORE_CORRUPTED")
+        if target.exists():
+            if not target.is_file() or target.stat().st_size != size:
+                raise ServiceError(503, "UPLOAD_STORE_CORRUPTED")
+            # Never trust a matching filename without verifying the stored bytes.
+            existing_hash = hashlib.sha256()
+            with target.open("rb") as handle:
+                for block in iter(lambda: handle.read(1024 * 1024), b""):
+                    existing_hash.update(block)
+            if existing_hash.hexdigest() != checksum:
+                raise ServiceError(503, "UPLOAD_STORE_CORRUPTED")
+        else:
+            temporary.replace(target)
+
+
 async def save_upload(services, uploaded):
     filename = uploaded.filename or ""
     reject_environment_path(Path(filename))
@@ -25,7 +45,12 @@ async def save_upload(services, uploaded):
     if suffix not in (".pdf", ".md", ".txt", ".docx", ".csv", ".json"):
         raise ServiceError(422, "UNSUPPORTED_FILE")
     limit = services.settings.max_upload_bytes if suffix == ".pdf" else 2 * 1024 * 1024
-    temporary = services.db.root / "uploads" / (uid("upload") + ".pending")
+    upload_directory = services.db.root / "uploads"
+    if upload_directory.is_symlink() or not upload_directory.is_dir():
+        raise ServiceError(503, "UPLOAD_STORE_CORRUPTED")
+    # Resolve the directory before writing, including the environment-file guard.
+    services.db.artifact_path("uploads")
+    temporary = upload_directory / (uid("upload") + ".pending")
     services.db.capacity_check(limit)
     hasher, size, prefix = hashlib.sha256(), 0, b""
     try:
@@ -44,9 +69,7 @@ async def save_upload(services, uploaded):
         if not size or (suffix == ".pdf" and b"%PDF-" not in prefix):
             raise ServiceError(422, "INVALID_FILE_CONTENT")
         checksum = hasher.hexdigest()
-        target = services.db.root / "uploads" / checksum
-        if not target.exists():
-            temporary.replace(target)
+        await asyncio.to_thread(_commit_upload, services, temporary, checksum, size)
         return filename, checksum
     finally:
         # This is the exact generated temporary file, never a user-supplied path.

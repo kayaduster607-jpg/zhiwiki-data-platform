@@ -11,8 +11,9 @@ from .common import ServiceError, digest, encode, uid
 from .quality import assess_page, summarize_quality
 
 
-# Pipeline identity includes the quality-rule generation and parser behavior.
-PIPELINE = "pdf-text-nfkc-visible-glyphs-fixed900-120-quality-v2"
+# Bump this identity whenever parser or quality rules change so an update can
+# reprocess content whose previous revision used an older processing contract.
+PIPELINE = "pdf-text-nfkc-visible-glyphs-fixed900-120-quality-v3"
 
 
 class Jobs:
