@@ -1,0 +1,122 @@
+{
+  "duration_seconds": 77.0,
+  "frame_count": 1925,
+  "width": 1600,
+  "height": 900,
+  "codec": "H.264",
+  "audio": false,
+  "synthetic_data": true,
+  "real_local_api_and_worker": true,
+  "credential_redaction": "opaque during token display; generated token subsequently revoked",
+  "sha256": "5dab70b6ce769d23ae26bfe8830e27c6ab0b916f3e904065f2079bd327265d3f",
+  "bytes": 3145575,
+  "full_decode_verified": true,
+  "timing_offset_seconds": 0.674,
+  "chapters": [
+    {
+      "start_seconds": 1.121,
+      "title": "知证团队知识工作台",
+      "description": "真实本机 API 与独立 worker，使用虚构资料和临时账号。"
+    },
+    {
+      "start_seconds": 5.418,
+      "title": "建立团队工作区",
+      "description": "创建知识库与用户，再按知识库分配访问角色。"
+    },
+    {
+      "start_seconds": 9.203,
+      "title": "按知识库授权",
+      "description": "只读、编辑与发布权限由服务器执行，页面显示实际角色。"
+    },
+    {
+      "start_seconds": 12.594,
+      "title": "提交真实文件",
+      "description": "稳定来源键关联资料；202 仅表示接收，处理和发布分开。"
+    },
+    {
+      "start_seconds": 15.978,
+      "title": "跟进持久任务",
+      "description": "处理状态来自服务器，刷新后用同一个任务 ID 继续跟进。"
+    },
+    {
+      "start_seconds": 19.49,
+      "title": "核对原始资料",
+      "description": "原始抽取与校订正文并列；未审核的新稿不进入普通检索。"
+    },
+    {
+      "start_seconds": 22.835,
+      "title": "明确复核并条件发布",
+      "description": "复核后仍需确认发布；使用当前修订作为版本条件。"
+    },
+    {
+      "start_seconds": 26.734,
+      "title": "取得可核验的原文证据",
+      "description": "实际检索、回读、校验；语义是否支持结论仍需人工核对。"
+    },
+    {
+      "start_seconds": 30.122,
+      "title": "导入来源的新修订",
+      "description": "稳定来源键关联资料；202 仅表示接收，处理和发布分开。"
+    },
+    {
+      "start_seconds": 33.511,
+      "title": "跟进持久任务",
+      "description": "处理状态来自服务器，刷新后用同一个任务 ID 继续跟进。"
+    },
+    {
+      "start_seconds": 36.865,
+      "title": "核对原始资料",
+      "description": "原始抽取与校订正文并列；未审核的新稿不进入普通检索。"
+    },
+    {
+      "start_seconds": 40.291,
+      "title": "并发冲突保留输入",
+      "description": "另一窗口已经更新时拒绝旧写入，保留本地正文供比较。"
+    },
+    {
+      "start_seconds": 44.754,
+      "title": "校订后重新复核",
+      "description": "修改正文会撤销复核结果，不能直接沿用旧审批发布。"
+    },
+    {
+      "start_seconds": 48.098,
+      "title": "明确复核并条件发布",
+      "description": "复核后仍需确认发布；使用当前修订作为版本条件。"
+    },
+    {
+      "start_seconds": 51.7,
+      "title": "旧引用失效",
+      "description": "新版发布后，服务端拒绝旧证据；使用者需要重新取证。"
+    },
+    {
+      "start_seconds": 56.272,
+      "title": "取得可核验的原文证据",
+      "description": "实际检索、回读、校验；语义是否支持结论仍需人工核对。"
+    },
+    {
+      "start_seconds": 59.706,
+      "title": "生成受限 Agent 令牌",
+      "description": "录屏已遮挡明文；令牌只允许授权知识库与指定只读能力。"
+    },
+    {
+      "start_seconds": 63.114,
+      "title": "撤销立即生效",
+      "description": "真实 Bearer 请求被拒绝；演示凭证为临时生成并已撤销。"
+    },
+    {
+      "start_seconds": 66.718,
+      "title": "运行状态与审计",
+      "description": "显示真实健康、worker 心跳和操作记录；生产验收仍需现场完成。"
+    },
+    {
+      "start_seconds": 70.224,
+      "title": "只读账号的边界",
+      "description": "管理入口不展示，直接调用管理 API 也由服务器返回 403。"
+    },
+    {
+      "start_seconds": 73.534,
+      "title": "可复核交付",
+      "description": "PRD、代码、验证脚本与验收边界随仓库保存。"
+    }
+  ]
+}

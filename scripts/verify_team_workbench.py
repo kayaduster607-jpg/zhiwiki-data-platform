@@ -81,6 +81,7 @@ def main():
     parser.add_argument("--node", default="node")
     parser.add_argument("--playwright-module", default="playwright")
     parser.add_argument("--browser")
+    parser.add_argument("--record-video", action="store_true", help="Record an annotated walkthrough with synthetic data")
     args = parser.parse_args()
     output = safe_path(args.output)
     output.mkdir(parents=True, exist_ok=True)
@@ -96,9 +97,10 @@ def main():
         worker = subprocess.Popen(command, cwd=Path(__file__).resolve().parents[1], stdout=log, stderr=log)
         try:
             payload = {"base_url": "http://127.0.0.1:" + str(port), "admin_password": password,
-                       "reader_password": secrets.token_urlsafe(24), "output": str(run_root), "browser": args.browser}
+                       "reader_password": secrets.token_urlsafe(24), "output": str(run_root), "browser": args.browser,
+                       "record_video": args.record_video}
             result = subprocess.run([args.node, str(Path(__file__).with_suffix(".cjs")), args.playwright_module],
-                input=json.dumps(payload), text=True, encoding="utf-8", capture_output=True, timeout=240)
+                input=json.dumps(payload), text=True, encoding="utf-8", capture_output=True, timeout=300)
             if result.returncode:
                 raise RuntimeError("Browser verification failed:\n" + result.stderr[-10000:])
             browser_report = json.loads(result.stdout)
@@ -110,7 +112,7 @@ def main():
               "scope": "isolated local API, real worker process and browser; no production SLA claim"}
     (output / "browser-verification.json").write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
     print(json.dumps({"result": "passed", "report": str(output / "browser-verification.json"),
-                      "screenshots": str(run_root), "checks": browser_report["checks"]}, ensure_ascii=False))
+                      "screenshots": str(run_root), "checks": browser_report["checks"], "video": browser_report.get("video")}, ensure_ascii=False))
 
 
 if __name__ == "__main__":

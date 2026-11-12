@@ -411,6 +411,15 @@ input[readonly] {
 .check-row input {
   width:auto
 }
+.form-stack label.check-row {
+  display:flex;
+  align-items:center;
+  gap:10px
+}
+.form-stack .check-row input {
+  width:auto;
+  flex:none
+}
 .feedback {
   margin:18px 38px 0;
   padding:14px 18px;

@@ -63,3 +63,5 @@ python -B scripts/verify_team_workbench.py --output reports/local-workbench --no
 ```
 
 替换三个 PATH 参数为本机已安装工具位置；若 Playwright 可直接从 Node 解析，可省略 --playwright-module。报告与生成数据写入指定目录，使用全新随机子目录，不覆盖既有业务资料。验证只监听回环地址，不提供默认账号或固定密码。
+
+可加 --record-video 录制带中文步骤说明、遮挡令牌明文的演示，再使用 scripts/export_team_demo.py 导出 MP4。成片和完整复现步骤见[视频说明](DEMO_VIDEO.md)。
