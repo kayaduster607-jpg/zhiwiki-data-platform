@@ -10,7 +10,7 @@ from types import SimpleNamespace
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from starlette.exceptions import HTTPException
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
@@ -67,7 +67,7 @@ def create_service_app(settings=None, database=None):
             await asyncio.to_thread(gate.close)
             instance.close()
 
-    app = FastAPI(title="知证 · Team Retrieval API", version="1.0.0", lifespan=lifespan,
+    app = FastAPI(title="知证 · Team Retrieval API", version="1.1.0", lifespan=lifespan,
                   docs_url=None, redoc_url=None, openapi_url="/v1/openapi.json")
     app.state.services = services
     app.add_middleware(RequestBoundary, authorization=auth, settings=settings, telemetry=services.telemetry)
@@ -128,11 +128,14 @@ def create_service_app(settings=None, database=None):
 
     @app.get("/v1/capabilities")
     def capabilities(request: Request):
-        return envelope(request, {"capabilities": ["retrieve", "evidence_read", "citation_validate", "pdf_text_ingest_jobs"],
+        return envelope(request, {"capabilities": ["retrieve", "evidence_read", "citation_validate", "pdf_text_ingest_jobs", "team_workbench"],
                                   "model_calls_on_retrieve": 0,
                                   "limits": {"query_chars": 4000, "top_k": 20, "context_char_budget": 20000,
                                              "request_timeout_ms": settings.request_timeout_ms,
-                                             "accepted_requests": settings.accepted_requests}})
+                                             "accepted_requests": settings.accepted_requests,
+                                             "max_upload_bytes": settings.max_upload_bytes,
+                                             "max_text_upload_bytes": 2 * 1024 * 1024,
+                                             "max_pdf_pages": settings.max_pdf_pages}})
 
     @app.api_route("/api/{path:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE"], include_in_schema=False)
     def legacy_disabled(path: str):
@@ -144,10 +147,19 @@ def create_service_app(settings=None, database=None):
         from .web import CONSOLE
         return CONSOLE
 
+    @app.get("/assets/team/{asset}", include_in_schema=False)
+    def console_asset(asset: str):
+        from .web import asset_path
+        path = asset_path(asset)
+        media = "text/css" if path.suffix == ".css" else "text/javascript"
+        return FileResponse(path, media_type=media, headers={"Cache-Control": "no-cache"})
+
     app.include_router(security_router(services))
     app.include_router(retrieval_router(services))
     from .routes_documents import documents_router
     from .routes_maintenance import maintenance_router
     app.include_router(documents_router(services))
     app.include_router(maintenance_router(services))
+    from .routes_console import console_router
+    app.include_router(console_router(services))
     return app

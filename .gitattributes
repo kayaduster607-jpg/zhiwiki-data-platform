@@ -1,0 +1,2 @@
+# Benchmark manifests hash exact corpus bytes, including line endings.
+examples/benchmark/** text eol=lf

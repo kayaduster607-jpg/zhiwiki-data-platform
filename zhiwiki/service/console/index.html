@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>知证 团队知识工作台</title>
+  <link rel="stylesheet" href="/assets/team/style.css">
+  <script type="module" src="/assets/team/app.js"></script>
+</head>
+<body>
+  <!-- Extend the established navy/mint workbench. The task, not a dashboard,
+       leads: source -> import -> review -> publish -> verifiable evidence.
+       Only actual /v1 results populate the interface; no demo state is shipped. -->
+  <a class="skip-link" href="#content">跳到主要内容</a>
+  <p id="boot-status" class="noscript">正在确认会话…</p>
+  <section id="login-panel" class="login-panel" hidden>
+    <div class="brand"><span class="brand-mark" aria-hidden="true">知</span><span>知证<small>团队知识工作台</small></span></div>
+    <h1>登录工作区</h1>
+    <p class="muted">维护资料、复核新版本，让每次取证都有可核对的来源。</p>
+    <form id="login-form" class="form-stack" method="post" action="/v1/sessions">
+      <label>用户名<input name="username" autocomplete="username" required minlength="2" maxlength="64"></label>
+      <label>密码<input name="password" type="password" autocomplete="current-password" required maxlength="1024"></label>
+      <button class="primary" type="submit">登录</button>
+    </form>
+    <p id="login-error" role="alert" class="error-text"></p>
+    <p class="hint">请使用管理员建立的账号。首次部署通过 bootstrap 创建管理员，系统没有默认密码。</p>
+  </section>
+  <div id="workbench" class="app-shell" hidden>
+    <aside class="sidebar">
+      <a class="brand" href="#documents"><span class="brand-mark" aria-hidden="true">知</span><span>知证<small>团队知识工作台</small></span></a>
+      <div class="workspace-name">默认团队<span id="identity"></span></div>
+      <nav aria-label="主导航">
+        <a href="#documents" data-view="documents">资料与版本</a>
+        <a href="#tasks" data-view="tasks" data-editor>导入任务</a>
+        <a href="#review" data-view="review" data-editor>复核与发布</a>
+        <a href="#evidence" data-view="evidence">检索与取证</a>
+        <a href="#access" data-view="access">账号与接入</a>
+        <a href="#operations" data-view="operations" data-admin>运行与审计</a>
+      </nav>
+      <div class="sidebar-foot"><span id="account-name"></span><button id="logout" type="button" class="text-button">退出登录</button></div>
+    </aside>
+    <main id="content" tabindex="-1">
+      <header class="context-bar"><span>工作区 / 默认团队</span><div class="context-controls"><label>知识库 <select id="knowledge-base" aria-label="当前知识库"></select></label><span id="library-role" class="status neutral"></span></div></header>
+      <div id="feedback" class="feedback" role="status" aria-live="polite" hidden></div>
+      <div id="view" class="content" aria-live="polite"></div>
+      <footer>知证团队服务 <span>待审资料保持私有，发布与取证均由服务器检查权限和版本。</span></footer>
+    </main>
+  </div>
+  <noscript><p class="noscript">此工作台需要 JavaScript。请启用后刷新，或使用受权的团队 HTTP API。</p></noscript>
+</body>
+</html>

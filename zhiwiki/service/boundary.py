@@ -13,7 +13,7 @@ from .common import ServiceError, digest, uid
 
 
 def error_response(error, request_id):
-    headers = {"X-Request-Id": request_id}
+    headers = {"X-Request-Id": request_id, "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff"}
     if error.retryable:
         headers["Retry-After"] = "1"
     if getattr(error, "location", None):
@@ -57,7 +57,8 @@ class RequestBoundary:
             origin = headers.get(b"origin", b"").decode("latin1")
             if origin and urlsplit(origin).netloc != headers.get(b"host", b"").decode("latin1"):
                 raise ServiceError(403, "CROSS_SITE_REQUEST")
-            public = path in ("/", "/login", "/health/live", "/health/ready", "/health/worker") or (path == "/v1/sessions" and scope["method"] == "POST")
+            from .web import public_asset
+            public = path in ("/", "/login", "/health/live", "/health/ready", "/health/worker") or public_asset(path) or (path == "/v1/sessions" and scope["method"] == "POST")
             if not public:
                 from http.cookies import SimpleCookie
                 cookies = SimpleCookie()
@@ -119,6 +120,14 @@ class RequestBoundary:
                 if message["type"] == "http.response.start":
                     status, response_started = message["status"], True
                     message["headers"] = list(message.get("headers", [])) + [(b"x-request-id", request_id.encode())]
+                    # Private API data and session pages must not survive in caches.
+                    message["headers"].extend([(b"x-content-type-options", b"nosniff"),
+                                               (b"x-frame-options", b"DENY"),
+                                               (b"referrer-policy", b"same-origin")])
+                    if not public_asset(path):
+                        message["headers"].append((b"cache-control", b"no-store"))
+                    if path in ("/", "/login"):
+                        message["headers"].append((b"content-security-policy", b"default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'"))
                 # A stalled download cannot occupy a response task indefinitely.
                 if download_lease and time.monotonic() - started >= 180:
                     raise asyncio.TimeoutError()

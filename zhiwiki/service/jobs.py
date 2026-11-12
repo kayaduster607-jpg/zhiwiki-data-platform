@@ -69,16 +69,21 @@ class Jobs:
 
     def get(self, context, job_id):
         with self.db.tx() as connection:
-            row = connection.execute("SELECT j.*,r.quality,r.book_id FROM team_jobs j JOIN team_revisions r ON r.id=j.revision_id WHERE j.id=?",
+            row = connection.execute("SELECT j.*,r.quality,r.book_id,r.filename,r.number AS revision_number,"
+                                     "b.source_key,b.current_revision FROM team_jobs j JOIN team_revisions r ON r.id=j.revision_id "
+                                     "JOIN team_books b ON b.id=r.book_id WHERE j.id=?",
                                      (job_id,)).fetchone()
             if not row:
                 raise ServiceError(404, "RESOURCE_NOT_FOUND")
-            current = self.auth.require(connection, context, [row["kb_id"]])
-            if row["owner"] != current["id"]:
-                self.auth.require(connection, context, [row["kb_id"]], role="editor")
+            current = self.auth.require(connection, context, [row["kb_id"]], role="editor")
+            if current["kind"] != "session":
+                raise ServiceError(403, "PERMISSION_DENIED")
             return {"job_id": row["id"], "status": row["status"], "pages_total": row["pages_total"],
+                    "knowledge_base_id": row["kb_id"],
                     "pages_done": row["pages_done"], "attempt": row["attempt"], "updated_at": row["updated"],
                     "document_id": row["book_id"], "revision_id": row["revision_id"],
+                    "filename": row["filename"], "revision_number": row["revision_number"],
+                    "source_key": row["source_key"], "current_revision": row["current_revision"],
                     "quality_summary": json.loads(row["quality"]), "error": row["error"]}
 
     def cancel(self, context, job_id):
@@ -212,7 +217,7 @@ class Jobs:
 
     @staticmethod
     def revision(connection, book_id, revision_id):
-        row = connection.execute("SELECT r.*,b.kb_id,b.current_revision FROM team_revisions r JOIN team_books b ON b.id=r.book_id WHERE r.id=? AND b.id=?",
+        row = connection.execute("SELECT r.*,b.kb_id,b.current_revision,b.source_key FROM team_revisions r JOIN team_books b ON b.id=r.book_id WHERE r.id=? AND b.id=?",
                                  (revision_id, book_id)).fetchone()
         if not row:
             raise ServiceError(404, "RESOURCE_NOT_FOUND")

@@ -87,7 +87,12 @@ def documents_router(services):
             ids = services.db.kb_ids(connection, current["id"], current["admin"])
             if current["kind"] != "session":
                 ids = [key for key in ids if key in current["kb_ids"]]
-            values = [dict(connection.execute("SELECT id,title,generation FROM team_kbs WHERE id=?", (key,)).fetchone()) for key in ids]
+            values = []
+            for key in ids:
+                item = dict(connection.execute("SELECT id,title,generation FROM team_kbs WHERE id=?", (key,)).fetchone())
+                grant = connection.execute("SELECT role FROM team_grants WHERE user_id=? AND kb_id=?", (current["id"], key)).fetchone()
+                item["role"] = "admin" if current["admin"] else grant[0]
+                values.append(item)
         return envelope(request, {"knowledge_bases": values})
 
     @router.post("/uploads", status_code=202, tags=["documents"], openapi_extra={
@@ -130,16 +135,24 @@ def documents_router(services):
         owner = context(request)["id"]
         after = decode(services.db.cursor_key, cursor, owner, knowledge_base_id, limit) if cursor else ""
         with services.db.tx() as connection:
-            services.auth.require(connection, context(request), [knowledge_base_id])
-            rows = connection.execute("SELECT id,title,current_revision FROM team_books WHERE kb_id=? AND id>? ORDER BY id LIMIT ?",
+            current = services.auth.require(connection, context(request), [knowledge_base_id])
+            grant = connection.execute("SELECT role FROM team_grants WHERE user_id=? AND kb_id=?", (current["id"], knowledge_base_id)).fetchone()
+            can_edit = current["kind"] == "session" and (current["admin"] or grant[0] != "reader")
+            # Readers must not learn unpublished source names from the directory.
+            public_only = "" if can_edit else " AND b.current_revision IS NOT NULL"
+            rows = connection.execute("SELECT b.id,b.title,b.source_key,b.current_revision,r.number AS current_number "
+                                      "FROM team_books b LEFT JOIN team_revisions r ON r.id=b.current_revision "
+                                      "WHERE b.kb_id=? AND b.id>?" + public_only + " ORDER BY b.id LIMIT ?",
                                       (knowledge_base_id, after, limit + 1)).fetchall()
         result = [dict(row) for row in rows[:limit]]
         return envelope(request, {"documents": result, "next_cursor": issue(services.db.cursor_key, owner, knowledge_base_id, result[-1]["id"], limit) if len(rows) > limit else None})
 
     def accessible_revision(connection, request, book_id, revision_id):
         row = services.jobs.revision(connection, book_id, revision_id)
-        services.auth.require(connection, context(request), [row["kb_id"]])
+        current = services.auth.require(connection, context(request), [row["kb_id"]])
         if row["current_revision"] != revision_id:
+            if current["kind"] != "session":
+                raise ServiceError(403, "PERMISSION_DENIED")
             services.auth.require(connection, context(request), [row["kb_id"]], role="editor")
         return row
 
@@ -148,7 +161,10 @@ def documents_router(services):
         with services.db.tx() as connection:
             row = accessible_revision(connection, request, book_id, revision_id)
             return envelope(request, {"document_id": book_id, "revision_id": revision_id, "status": row["status"],
-                                      "number": row["number"], "quality": json.loads(row["quality"]), "reviewed": bool(row["reviewed"])})
+                                      "knowledge_base_id": row["kb_id"],
+                                      "number": row["number"], "quality": json.loads(row["quality"]), "reviewed": bool(row["reviewed"]),
+                                      "current_revision": row["current_revision"], "filename": row["filename"], "source_key": row["source_key"],
+                                      "page_count": connection.execute("SELECT COUNT(*) FROM team_pages WHERE revision_id=?", (revision_id,)).fetchone()[0]})
 
     @router.get("/documents/{book_id}/revisions/{revision_id}/pages/{page}", tags=["documents"])
     def page(book_id: str, revision_id: str, page: int, request: Request):

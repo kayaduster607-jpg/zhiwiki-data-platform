@@ -50,4 +50,10 @@ CREATE TABLE IF NOT EXISTS team_audit(
 CREATE TABLE IF NOT EXISTS team_metadata(
  book_id TEXT PRIMARY KEY REFERENCES team_books(id), payload TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS team_runtime(name TEXT PRIMARY KEY,payload TEXT NOT NULL);
+-- Additive indexes support bounded console reads without changing stored content.
+CREATE INDEX IF NOT EXISTS team_books_kb_id ON team_books(kb_id,id);
+CREATE INDEX IF NOT EXISTS team_jobs_kb_status_id ON team_jobs(kb_id,status,id);
+CREATE INDEX IF NOT EXISTS team_jobs_kb_id ON team_jobs(kb_id,id);
+CREATE INDEX IF NOT EXISTS team_jobs_revision_id ON team_jobs(revision_id,id);
+CREATE INDEX IF NOT EXISTS team_revisions_book_id ON team_revisions(book_id,id);
 """

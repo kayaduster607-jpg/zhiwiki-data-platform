@@ -113,7 +113,11 @@ def maintenance_router(services):
     @router.post("/users/{user_id}:disable", tags=["admin"])
     def disable(user_id: str, request: Request):
         with services.db.tx(write=True) as connection:
-            services.auth.admin(connection, context(request))
+            current = services.auth.admin(connection, context(request))
+            if user_id == current["id"]:
+                raise ServiceError(409, "CANNOT_DISABLE_SELF")
+            if not connection.execute("SELECT 1 FROM team_users WHERE id=?", (user_id,)).fetchone():
+                raise ServiceError(404, "RESOURCE_NOT_FOUND")
             connection.execute("UPDATE team_users SET disabled=1 WHERE id=?", (user_id,))
             services.db.audit(connection, context(request)["id"], "user.disable", user_id)
         return envelope(request, {"disabled": True})

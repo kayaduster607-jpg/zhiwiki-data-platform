@@ -1,0 +1,36 @@
+{
+  "date": "2026-11-12",
+  "baseline": "bc912b69f48b6827a1522302dcaf765e1c5ec63a",
+  "python": {
+    "baseline_passed": 289,
+    "final_passed": 307,
+    "new_cases": 18,
+    "runtime": "3.13.5"
+  },
+  "node": {
+    "passed": 68,
+    "failed": 0
+  },
+  "browser": {
+    "checks": [
+      "网页创建用户、知识库并授予 reader",
+      "真实文件导入、独立 worker 和任务刷新恢复",
+      "真实检索、原文回读与引用校验",
+      "真实 worker 处理更新修订",
+      "真实 412 冲突保留输入、重读比较和校订撤销复核",
+      "新版发布后旧引用被服务端拒绝",
+      "真实检索、原文回读与引用校验",
+      "令牌生成、真实 Bearer 使用、清除明文与撤销生效；无持久浏览器存储",
+      "真实检索、原文回读与引用校验",
+      "reader 无管理入口且服务端拒绝管理查询；390px 页面无横向溢出"
+    ],
+    "uncaught_errors": [],
+    "api": "real local service",
+    "worker": "real separate supervisor and parser processes"
+  },
+  "restore": {
+    "database_original_files_and_grants_restored": true,
+    "published_revision": 2
+  },
+  "scope": "isolated local verification; production environment not accepted"
+}

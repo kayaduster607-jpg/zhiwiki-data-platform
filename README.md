@@ -16,6 +16,10 @@ Python 3.13 · FastAPI · SQLite WAL · 异步导入 · 人工复核 · BM25
 
 > 当前定位为**单机内部团队实现和工程实践项目**。CSV/JSON 以文档原文保存并检索；不存在数据库连接器、结构化数仓或增量同步。真实部署仍需对安全、容量、备份恢复与监控进行现场验收。
 
+![团队资料与版本工作台](docs/assets/team-workbench.png)
+
+截图来自真实本机 API 与独立 worker 的隔离验收，使用虚构资料和生成账户。改造范围、307 项 Python 与 68 项 Node 回归、浏览器和恢复验证见[本地交付验收](docs/TEAM_WORKBENCH_ACCEPTANCE.md)。
+
 ## 为什么做这个项目
 
 | 场景 | 常见问题 | 知证的处理方式 |
@@ -129,7 +133,9 @@ python -B -m zhiwiki.service --config config.team.example.json serve --port 8872
 python -B -m zhiwiki.service --config config.team.example.json worker
 ```
 
-打开 [http://127.0.0.1:8872](http://127.0.0.1:8872) 登录。团队页面提供基础登录与检索；知识库、用户授权、上传、质检和发布操作请参阅[团队服务手册](docs/TEAM_SERVICE.md)及[质量与审核说明](docs/TEAM_DATA_QUALITY.md)。
+打开 [http://127.0.0.1:8872](http://127.0.0.1:8872) 登录。团队网页提供资料与版本、真实文件导入、可恢复任务、逐页校订、复核发布、原文取证、账号授权、Agent 令牌及运行审计。管理操作使用真实 `/v1` API，不依赖演示数据或浏览器持久存储。
+
+使用步骤见[团队网页手册](docs/TEAM_WORKBENCH.md)，产品范围与验收条件见[团队工作台 PRD](docs/PRD_TEAM_WORKBENCH_V1.md)。HTTP 接入见[团队服务手册](docs/TEAM_SERVICE.md)及[质量与审核说明](docs/TEAM_DATA_QUALITY.md)。正式环境仍需独立完成部署验收。
 
 ### 3. 体验本地工作台
 
